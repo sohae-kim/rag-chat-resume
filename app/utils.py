@@ -15,12 +15,16 @@ def load_embeddings() -> List[Dict[str, Any]]:
     if _embeddings_cache is None:
         # Check multiple possible locations
         possible_paths = [
-            # Temp directory (writable)
-            os.path.join(tempfile.gettempdir(), "embeddings.json"),
             # Standard locations
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
             os.path.join(os.getcwd(), "data", "embeddings.json"),
-            "/var/task/data/embeddings.json"
+            "/var/task/data/embeddings.json",
+            # Backup locations
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "embeddings.json"),
+            os.path.join(os.getcwd(), "embeddings.json"),
+            "/var/task/embeddings.json",
+            # Temp directory
+            os.path.join(tempfile.gettempdir(), "embeddings.json")
         ]
         
         # Try each path
@@ -35,13 +39,13 @@ def load_embeddings() -> List[Dict[str, Any]]:
                     print(f"Error loading from {embeddings_path}: {str(e)}")
         
         if _embeddings_cache is None:
-            # If we still don't have embeddings, create a minimal set
+            # If we still don't have embeddings, use a fallback
             print("WARNING: Using fallback minimal embeddings")
             _embeddings_cache = [
                 {
-                    "id": "fallback",
-                    "content": "This is a fallback response because embeddings could not be loaded.",
-                    "url": "#",
+                    "id": "about",
+                    "content": "Sohae Kim is a Staff Engineer with experience in machine learning and data science.",
+                    "url": "https://sohae-kim.github.io/#about",
                     "embedding": [0] * 1536  # Standard OpenAI embedding size
                 }
             ]

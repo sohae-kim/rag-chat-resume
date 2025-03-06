@@ -1,16 +1,10 @@
 {
     "version": 2,
+    "buildCommand": "python scripts/build.py",
     "builds": [
         {
             "src": "api/index.py",
             "use": "@vercel/python"
-        },
-        {
-            "src": "scripts/generate_embeddings.py",
-            "use": "@vercel/python",
-            "config": {
-                "buildCommand": "python scripts/generate_embeddings.py"
-            }
         },
         {
             "src": "data/**",
