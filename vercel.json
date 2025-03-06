@@ -6,10 +6,10 @@
             "use": "@vercel/python"
         },
         {
-            "src": "scripts/build.py",
+            "src": "scripts/generate_embeddings.py",
             "use": "@vercel/python",
             "config": {
-                "buildCommand": "python scripts/build.py"
+                "buildCommand": "python scripts/generate_embeddings.py"
             }
         },
         {
