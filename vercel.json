@@ -13,6 +13,10 @@
             }
         },
         {
+            "src": "data/**",
+            "use": "@vercel/static"
+        },
+        {
             "src": "public/**",
             "use": "@vercel/static"
         }
@@ -21,6 +25,10 @@
         {
             "src": "/api/(.*)",
             "dest": "/api/index.py"
+        },
+        {
+            "src": "/data/(.*)",
+            "dest": "/data/$1"
         },
         {
             "src": "/(.*)",

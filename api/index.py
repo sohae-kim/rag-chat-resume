@@ -5,7 +5,9 @@ from typing import List
 import os
 import sys
 import json
+import shutil
 from pathlib import Path
+import tempfile
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +23,29 @@ import anthropic
 # Initialize API clients
 openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 claude_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+# Create a writable temp directory for the embeddings
+TEMP_DIR = tempfile.gettempdir()
+TEMP_EMBEDDINGS_PATH = os.path.join(TEMP_DIR, "embeddings.json")
+
+# Try to copy the embeddings file to the temp directory on startup
+try:
+    # Check various possible locations
+    possible_paths = [
+        "/var/task/data/embeddings.json",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
+        os.path.join(os.getcwd(), "data", "embeddings.json")
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            print(f"Found embeddings at {path}, copying to {TEMP_EMBEDDINGS_PATH}")
+            shutil.copy(path, TEMP_EMBEDDINGS_PATH)
+            break
+    else:
+        print("Warning: Could not find embeddings file to copy")
+except Exception as e:
+    print(f"Error copying embeddings file: {str(e)}")
 
 # Define models
 class QueryRequest(BaseModel):
@@ -93,4 +118,50 @@ async def chat(request: Request, query: QueryRequest):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok"} 
+    return {"status": "ok"}
+
+@app.get("/api/debug")
+async def debug():
+    """Debug endpoint to check file paths and environment"""
+    import os
+    import sys
+    import tempfile
+    
+    # Check various paths
+    cwd = os.getcwd()
+    temp_dir = tempfile.gettempdir()
+    
+    # Check for data directory
+    data_dir = os.path.join(cwd, "data")
+    data_exists = os.path.exists(data_dir)
+    
+    # Check for embeddings file in various locations
+    embeddings_paths = [
+        os.path.join(temp_dir, "embeddings.json"),
+        os.path.join(cwd, "data", "embeddings.json"),
+        "/var/task/data/embeddings.json"
+    ]
+    
+    embeddings_status = {}
+    for path in embeddings_paths:
+        embeddings_status[path] = {
+            "exists": os.path.exists(path),
+            "size": os.path.getsize(path) if os.path.exists(path) else 0
+        }
+    
+    # List files in key directories
+    files_in_cwd = os.listdir(cwd) if os.path.exists(cwd) else []
+    files_in_data = os.listdir(data_dir) if data_exists else []
+    files_in_temp = os.listdir(temp_dir) if os.path.exists(temp_dir) else []
+    
+    return {
+        "cwd": cwd,
+        "temp_dir": temp_dir,
+        "data_dir_exists": data_exists,
+        "embeddings_status": embeddings_status,
+        "files_in_cwd": files_in_cwd,
+        "files_in_data": files_in_data,
+        "files_in_temp": files_in_temp,
+        "python_path": sys.path,
+        "env_vars": {k: "***" if "key" in k.lower() else v for k, v in os.environ.items()}
+    } 

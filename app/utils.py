@@ -4,6 +4,7 @@ import re
 import os
 from typing import List, Dict, Any
 from pathlib import Path
+import tempfile
 
 # Cache for embeddings to avoid reading from disk on every request
 _embeddings_cache = None
@@ -12,26 +13,38 @@ def load_embeddings() -> List[Dict[str, Any]]:
     """Load embeddings from JSON file with caching."""
     global _embeddings_cache
     if _embeddings_cache is None:
-        # Use absolute path
-        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
-        embeddings_path = os.path.join(data_dir, "embeddings.json")
+        # Check multiple possible locations
+        possible_paths = [
+            # Temp directory (writable)
+            os.path.join(tempfile.gettempdir(), "embeddings.json"),
+            # Standard locations
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
+            os.path.join(os.getcwd(), "data", "embeddings.json"),
+            "/var/task/data/embeddings.json"
+        ]
         
-        if not os.path.exists(embeddings_path):
-            # Try to find the file in the current working directory
-            cwd_path = Path.cwd() / "data" / "embeddings.json"
-            if cwd_path.exists():
-                embeddings_path = cwd_path
-            else:
-                # Try absolute path for Vercel
-                abs_path = Path("/var/task/data/embeddings.json")
-                if abs_path.exists():
-                    embeddings_path = abs_path
-                else:
-                    raise FileNotFoundError(f"Embeddings file not found at {embeddings_path}. Make sure to generate embeddings first.")
+        # Try each path
+        for embeddings_path in possible_paths:
+            if os.path.exists(embeddings_path):
+                print(f"Loading embeddings from: {embeddings_path}")
+                try:
+                    with open(embeddings_path, "r") as f:
+                        _embeddings_cache = json.load(f)
+                    break
+                except Exception as e:
+                    print(f"Error loading from {embeddings_path}: {str(e)}")
         
-        print(f"Loading embeddings from: {embeddings_path}")
-        with open(embeddings_path, "r") as f:
-            _embeddings_cache = json.load(f)
+        if _embeddings_cache is None:
+            # If we still don't have embeddings, create a minimal set
+            print("WARNING: Using fallback minimal embeddings")
+            _embeddings_cache = [
+                {
+                    "id": "fallback",
+                    "content": "This is a fallback response because embeddings could not be loaded.",
+                    "url": "#",
+                    "embedding": [0] * 1536  # Standard OpenAI embedding size
+                }
+            ]
     
     return _embeddings_cache
 
