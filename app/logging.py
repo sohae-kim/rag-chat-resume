@@ -1,30 +1,58 @@
-import logging
 import os
+import json
 from datetime import datetime
+import logging
 
-# Configure basic logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("rag_chat")
+# Check if running in Vercel (serverless environment)
+is_vercel = os.environ.get('VERCEL', '0') == '1'
 
-# Create a file handler if needed
-logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-os.makedirs(logs_dir, exist_ok=True)
-file_handler = logging.FileHandler(os.path.join(logs_dir, "security.log"))
-file_handler.setLevel(logging.WARNING)
+if is_vercel:
+    # Configure logging to use stdout in Vercel
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger('rag-chat')
+else:
+    # For local development, use file logging
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # Configure file handler
+    file_handler = logging.FileHandler(os.path.join(logs_dir, "app.log"))
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    
+    # Configure logger
+    logger = logging.getLogger('rag-chat')
+    logger.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
 
-# Set the format for logs
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+def log_security_event(ip, event_type, details):
+    """Log security events"""
+    event = {
+        "timestamp": datetime.now().isoformat(),
+        "ip": ip,
+        "type": event_type,
+        "details": details
+    }
+    logger.warning(f"SECURITY EVENT: {json.dumps(event)}")
 
-def log_security_event(ip: str, event_type: str, details: str):
-    """Log security-related events."""
-    logger.warning(f"SECURITY EVENT - {event_type} - IP: {ip} - {details}")
+def log_rate_limit(ip, message):
+    """Log rate limiting events"""
+    event = {
+        "timestamp": datetime.now().isoformat(),
+        "ip": ip,
+        "message": message
+    }
+    logger.info(f"RATE LIMIT: {json.dumps(event)}")
 
-def log_rate_limit(ip: str, reason: str):
-    """Log rate limiting events."""
-    logger.info(f"RATE LIMIT - IP: {ip} - {reason}")
-
-def log_api_usage(ip: str, query: str, tokens_used: int):
-    """Log API usage for auditing."""
-    logger.info(f"API USAGE - IP: {ip} - Tokens: {tokens_used} - Query: {query[:30]}...") 
+def log_api_usage(ip, query, tokens):
+    """Log API usage"""
+    event = {
+        "timestamp": datetime.now().isoformat(),
+        "ip": ip,
+        "query": query,
+        "tokens": tokens
+    }
+    logger.info(f"API USAGE: {json.dumps(event)}") 
