@@ -8,44 +8,22 @@ import json
 import shutil
 from pathlib import Path
 import tempfile
+import numpy as np
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Create a new FastAPI app just for the API routes
+# Create a new FastAPI app
 app = FastAPI()
 
-# Import necessary functions from your app
-from app.utils import sanitize_input, find_relevant_content, create_prompt, load_embeddings, cosine_similarity
+# Import necessary functions
+from app.utils import sanitize_input, create_prompt
 from openai import OpenAI
 import anthropic
 
 # Initialize API clients
 openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 claude_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-
-# Create a writable temp directory for the embeddings
-TEMP_DIR = tempfile.gettempdir()
-TEMP_EMBEDDINGS_PATH = os.path.join(TEMP_DIR, "embeddings.json")
-
-# Try to copy the embeddings file to the temp directory on startup
-try:
-    # Check various possible locations
-    possible_paths = [
-        "/var/task/data/embeddings.json",
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
-        os.path.join(os.getcwd(), "data", "embeddings.json")
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            print(f"Found embeddings at {path}, copying to {TEMP_EMBEDDINGS_PATH}")
-            shutil.copy(path, TEMP_EMBEDDINGS_PATH)
-            break
-    else:
-        print("Warning: Could not find embeddings file to copy")
-except Exception as e:
-    print(f"Error copying embeddings file: {str(e)}")
 
 # Define models
 class QueryRequest(BaseModel):
@@ -59,6 +37,153 @@ class QueryResponse(BaseModel):
     answer: str
     references: List[ReferenceItem]
 
+# Global cache for embeddings
+_embeddings_cache = None
+
+def load_embeddings():
+    """Load embeddings with robust error handling"""
+    global _embeddings_cache
+    
+    if _embeddings_cache is not None:
+        return _embeddings_cache
+    
+    # Try to load from various locations
+    possible_paths = [
+        os.path.join(tempfile.gettempdir(), "embeddings.json"),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
+        os.path.join(os.getcwd(), "data", "embeddings.json"),
+        "/var/task/data/embeddings.json"
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                print(f"Loading embeddings from: {path}")
+                with open(path, "r") as f:
+                    _embeddings_cache = json.load(f)
+                    
+                # Validate embeddings
+                if _embeddings_cache and len(_embeddings_cache) > 0:
+                    # Check if first item has an embedding
+                    if "embedding" in _embeddings_cache[0] and len(_embeddings_cache[0]["embedding"]) > 100:
+                        return _embeddings_cache
+                    else:
+                        print(f"Invalid embeddings in {path}")
+                else:
+                    print(f"Empty embeddings in {path}")
+            except Exception as e:
+                print(f"Error loading embeddings from {path}: {str(e)}")
+    
+    # If we get here, we need to load content and generate embeddings
+    print("Generating embeddings from content...")
+    return generate_embeddings_from_content()
+
+def load_content():
+    """Load content from content.json"""
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "content.json"),
+        os.path.join(os.getcwd(), "data", "content.json"),
+        "/var/task/data/content.json"
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            print(f"Loading content from: {path}")
+            with open(path, "r") as f:
+                return json.load(f)
+    
+    # Fallback content
+    print("WARNING: Using fallback content")
+    return [
+        {
+            "id": "about",
+            "content": "Sohae Kim is a Staff Engineer with experience in machine learning and data science.",
+            "url": "https://sohae-kim.github.io/#about"
+        },
+        {
+            "id": "experience",
+            "content": "Sohae has experience as a Staff Engineer at Samsung Display.",
+            "url": "https://sohae-kim.github.io/#experience"
+        },
+        {
+            "id": "education",
+            "content": "Sohae has a PhD from MIT in Mechanical Engineering.",
+            "url": "https://sohae-kim.github.io/#education"
+        }
+    ]
+
+def generate_embeddings_from_content():
+    """Generate embeddings from content as a fallback"""
+    global _embeddings_cache
+    
+    content_data = load_content()
+    embeddings_data = []
+    
+    # Only process the first 3 items to save on API costs in emergency situations
+    for item in content_data[:3]:
+        print(f"Generating embedding for: {item['id']}")
+        try:
+            response = openai_client.embeddings.create(
+                model="text-embedding-ada-002",
+                input=item["content"]
+            )
+            embeddings_data.append({
+                "id": item["id"],
+                "content": item["content"],
+                "url": item.get("url", f"https://sohae-kim.github.io/#{item['id']}"),
+                "embedding": response.data[0].embedding
+            })
+        except Exception as e:
+            print(f"Error generating embedding for {item['id']}: {str(e)}")
+    
+    # Cache the results
+    _embeddings_cache = embeddings_data
+    
+    # Try to save to temp directory for future requests
+    try:
+        temp_path = os.path.join(tempfile.gettempdir(), "embeddings.json")
+        with open(temp_path, "w") as f:
+            json.dump(embeddings_data, f)
+        print(f"Saved embeddings to {temp_path}")
+    except Exception as e:
+        print(f"Error saving embeddings to temp: {str(e)}")
+    
+    return embeddings_data
+
+def cosine_similarity(vec_a, vec_b):
+    """Calculate cosine similarity between two vectors."""
+    vec_a = np.array(vec_a)
+    vec_b = np.array(vec_b)
+    
+    dot_product = np.dot(vec_a, vec_b)
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    
+    if norm_a == 0 or norm_b == 0:
+        return 0
+    
+    return dot_product / (norm_a * norm_b)
+
+def find_relevant_content(query_embedding, top_k=3):
+    """Find the most relevant content based on embedding similarity."""
+    embeddings = load_embeddings()
+    
+    # Calculate similarity with all content
+    similarities = []
+    for item in embeddings:
+        similarity = cosine_similarity(query_embedding, item["embedding"])
+        similarities.append({
+            "id": item["id"],
+            "content": item["content"],
+            "url": item.get("url", f"https://sohae-kim.github.io/#{item['id']}"),
+            "similarity": similarity
+        })
+    
+    # Sort by similarity and take top k
+    sorted_similarities = sorted(similarities, key=lambda x: x["similarity"], reverse=True)
+    print(f"Top similarities: {[(item['id'], item['similarity']) for item in sorted_similarities[:top_k]]}")
+    return sorted_similarities[:top_k]
+
 @app.post("/api/chat", response_model=QueryResponse)
 async def chat(request: Request, query: QueryRequest):
     # Sanitize input
@@ -71,7 +196,7 @@ async def chat(request: Request, query: QueryRequest):
         }
     
     try:
-        # Generate embedding for the question using OpenAI
+        # Generate embedding for the question
         embedding_response = openai_client.embeddings.create(
             model="text-embedding-ada-002",
             input=sanitized_question
@@ -87,7 +212,7 @@ async def chat(request: Request, query: QueryRequest):
         # Create prompt
         prompt = create_prompt(sanitized_question, context)
         
-        # Generate response using Anthropic Claude
+        # Generate response using Claude
         message = claude_client.messages.create(
             model="claude-3-5-haiku-latest",
             max_tokens=300,
@@ -101,8 +226,8 @@ async def chat(request: Request, query: QueryRequest):
         # Prepare references
         references = [
             {
-                "title": item["id"],
-                "url": f"https://sohae-kim.github.io/#{item['id']}"
+                "title": item["id"].replace("_", " ").title(),
+                "url": item.get("url", f"https://sohae-kim.github.io/#{item['id']}")
             } 
             for item in relevant_content
         ]
@@ -222,3 +347,58 @@ async def embeddings_check():
         }
     except Exception as e:
         return {"error": str(e)} 
+
+def ensure_embeddings_exist():
+    """Check if embeddings exist, and generate them if they don't"""
+    # Check if embeddings already exist
+    data_dir = os.path.join(os.getcwd(), "data")
+    embeddings_path = os.path.join(data_dir, "embeddings.json")
+    
+    if os.path.exists(embeddings_path):
+        print(f"Embeddings already exist at {embeddings_path}")
+        return
+    
+    print("Embeddings not found, generating them...")
+    
+    # Ensure data directory exists
+    os.makedirs(data_dir, exist_ok=True)
+    
+    # Load content
+    content_path = os.path.join(data_dir, "content.json")
+    if not os.path.exists(content_path):
+        print(f"Content file not found at {content_path}")
+        return
+    
+    with open(content_path, "r") as f:
+        content_data = json.load(f)
+    
+    # Generate embeddings
+    embeddings_data = []
+    for item in content_data:
+        print(f"Generating embedding for: {item['id']}")
+        
+        # Generate embedding
+        response = openai_client.embeddings.create(
+            model="text-embedding-ada-002",
+            input=item["content"]
+        )
+        
+        # Add to data
+        embeddings_data.append({
+            "id": item["id"],
+            "url": item.get("url", f"https://sohae-kim.github.io/#{item['id']}"),
+            "content": item["content"],
+            "embedding": response.data[0].embedding
+        })
+    
+    # Save embeddings
+    with open(embeddings_path, "w") as f:
+        json.dump(embeddings_data, f)
+    
+    print(f"Generated and saved {len(embeddings_data)} embeddings")
+
+# Add this to your startup code
+try:
+    ensure_embeddings_exist()
+except Exception as e:
+    print(f"Error ensuring embeddings exist: {str(e)}")
