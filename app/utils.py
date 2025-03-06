@@ -3,6 +3,7 @@ import json
 import re
 import os
 from typing import List, Dict, Any
+from pathlib import Path
 
 # Cache for embeddings to avoid reading from disk on every request
 _embeddings_cache = None
@@ -15,11 +16,22 @@ def load_embeddings() -> List[Dict[str, Any]]:
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
         embeddings_path = os.path.join(data_dir, "embeddings.json")
         
-        try:
-            with open(embeddings_path, "r") as f:
-                _embeddings_cache = json.load(f)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Embeddings file not found at {embeddings_path}. Make sure to generate embeddings first.")
+        if not os.path.exists(embeddings_path):
+            # Try to find the file in the current working directory
+            cwd_path = Path.cwd() / "data" / "embeddings.json"
+            if cwd_path.exists():
+                embeddings_path = cwd_path
+            else:
+                # Try absolute path for Vercel
+                abs_path = Path("/var/task/data/embeddings.json")
+                if abs_path.exists():
+                    embeddings_path = abs_path
+                else:
+                    raise FileNotFoundError(f"Embeddings file not found at {embeddings_path}. Make sure to generate embeddings first.")
+        
+        print(f"Loading embeddings from: {embeddings_path}")
+        with open(embeddings_path, "r") as f:
+            _embeddings_cache = json.load(f)
     
     return _embeddings_cache
 
@@ -57,11 +69,17 @@ def find_relevant_content(query_embedding: List[float], top_k: int = 3) -> List[
     return sorted_similarities[:top_k]
 
 def sanitize_input(text: str) -> str:
-    """Sanitize user input to prevent prompt injection and limit length."""
-    # More thorough regex to remove script tags and other harmful characters
-    sanitized = re.sub(r'<[^>]*>', '', text)
-    # Trim and limit length
-    return sanitized.strip()[:200]
+    """Sanitize user input by removing special characters and excessive whitespace."""
+    if not text:
+        return ""
+    
+    # Remove any potentially harmful characters
+    text = re.sub(r'[^\w\s.,?!-]', '', text)
+    
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 def create_prompt(query: str, context: str) -> str:
     """Create a system prompt for Anthropic Claude."""
@@ -115,7 +133,16 @@ def detect_prompt_injection(question: str) -> bool:
         r"override",
         r"starting with",
         r"return full content",
-        r"give me the full"
+        r"give me the full",
+        r"ignore previous instructions",
+        r"disregard",
+        r"forget",
+        r"system prompt",
+        r"you are not",
+        r"new role",
+        r"instead of",
+        r"don't (be|act)",
+        r"stop being",
     ]
     
     # Convert to lowercase for case-insensitive matching
@@ -143,6 +170,9 @@ def check_content_safety(question: str) -> bool:
         r"jailbreak",
         r"ddos",
         r"attack",
+        r"(^|\s)(sex|porn|nude|naked)",
+        r"(^|\s)(illegal|crime)",
+        r"(^|\s)(drug|cocaine|heroin)",
         # Add more patterns as needed
     ]
     
