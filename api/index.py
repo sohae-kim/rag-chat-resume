@@ -16,7 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 app = FastAPI()
 
 # Import necessary functions from your app
-from app.utils import sanitize_input, find_relevant_content, create_prompt
+from app.utils import sanitize_input, find_relevant_content, create_prompt, load_embeddings, cosine_similarity
 from openai import OpenAI
 import anthropic
 
@@ -164,4 +164,61 @@ async def debug():
         "files_in_temp": files_in_temp,
         "python_path": sys.path,
         "env_vars": {k: "***" if "key" in k.lower() else v for k, v in os.environ.items()}
-    } 
+    }
+
+@app.get("/api/embeddings-check")
+async def embeddings_check():
+    """Check the quality of embeddings and similarity calculations"""
+    try:
+        # Load embeddings
+        embeddings = load_embeddings()
+        
+        # Basic stats
+        embedding_count = len(embeddings)
+        embedding_dimensions = len(embeddings[0]["embedding"]) if embedding_count > 0 else 0
+        
+        # Check for zero embeddings
+        zero_embeddings = []
+        for item in embeddings:
+            embedding = item["embedding"]
+            if all(v == 0 for v in embedding) or sum(abs(v) for v in embedding) < 0.001:
+                zero_embeddings.append(item["id"])
+        
+        # Test similarity between a few items
+        similarity_tests = []
+        if embedding_count >= 2:
+            for i in range(min(3, embedding_count)):
+                for j in range(i+1, min(4, embedding_count)):
+                    item1 = embeddings[i]
+                    item2 = embeddings[j]
+                    sim = cosine_similarity(item1["embedding"], item2["embedding"])
+                    similarity_tests.append({
+                        "item1": item1["id"],
+                        "item2": item2["id"],
+                        "similarity": sim
+                    })
+        
+        # Test query
+        test_query = "Tell me about Sohae's experience at Samsung"
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        # Generate embedding for test query
+        embedding_response = client.embeddings.create(
+            model="text-embedding-ada-002",
+            input=test_query
+        )
+        query_embedding = embedding_response.data[0].embedding
+        
+        # Find most similar content
+        relevant = find_relevant_content(query_embedding, top_k=3)
+        
+        return {
+            "embedding_count": embedding_count,
+            "embedding_dimensions": embedding_dimensions,
+            "zero_embeddings": zero_embeddings,
+            "similarity_tests": similarity_tests,
+            "test_query": test_query,
+            "relevant_content": [{"id": item["id"], "similarity": item["similarity"]} for item in relevant]
+        }
+    except Exception as e:
+        return {"error": str(e)} 

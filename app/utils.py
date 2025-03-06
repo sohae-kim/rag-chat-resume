@@ -73,12 +73,16 @@ def find_relevant_content(query_embedding: List[float], top_k: int = 3) -> List[
         similarities.append({
             "id": item["id"],
             "content": item["content"],
-            "url": item["url"],
+            "url": item.get("url", f"https://sohae-kim.github.io/#{item['id']}"),
             "similarity": similarity
         })
     
     # Sort by similarity (highest first) and take top_k results
     sorted_similarities = sorted(similarities, key=lambda x: x["similarity"], reverse=True)
+    
+    # Print top similarities for debugging
+    print(f"Top similarities: {[(item['id'], item['similarity']) for item in sorted_similarities[:top_k]]}")
+    
     return sorted_similarities[:top_k]
 
 def sanitize_input(text: str) -> str:
