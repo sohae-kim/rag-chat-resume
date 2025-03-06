@@ -3,7 +3,10 @@
     "builds": [
         {
             "src": "api/chat.py",
-            "use": "@vercel/python"
+            "use": "@vercel/python",
+            "config": {
+                "handler": "api.chat.lambda_handler"
+            }
         },
         {
             "src": "scripts/build.py",
