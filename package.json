@@ -4,8 +4,7 @@
     "description": "RAG-based chat for resume",
     "main": "index.js",
     "scripts": {
-        "build": "python scripts/build.py",
-        "dev": "uvicorn api.index:app --reload"
+        "build": "echo 'No build step required'"
     },
     "dependencies": {
         "next": "^14.0.0"
