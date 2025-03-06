@@ -1,20 +1,13 @@
 {
     "version": 2,
     "buildCommand": "python scripts/build.py",
-    "builds": [
-        {
-            "src": "api/index.py",
-            "use": "@vercel/python"
-        },
-        {
-            "src": "data/**",
-            "use": "@vercel/static"
-        },
-        {
-            "src": "public/**",
-            "use": "@vercel/static"
+    "functions": {
+        "api/index.py": {
+            "runtime": "python3.9",
+            "includeFiles": "data/**",
+            "memory": 1024
         }
-    ],
+    },
     "routes": [
         {
             "src": "/api/(.*)",
@@ -31,10 +24,5 @@
     ],
     "env": {
         "PYTHONPATH": "."
-    },
-    "functions": {
-        "api/index.py": {
-            "includeFiles": "data/**"
-        }
     }
 }
