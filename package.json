@@ -1,0 +1,13 @@
+{
+    "name": "rag-chat-resume",
+    "version": "1.0.0",
+    "description": "RAG-based chat for resume",
+    "main": "index.js",
+    "scripts": {
+        "build": "python scripts/build.py",
+        "dev": "uvicorn api.index:app --reload"
+    },
+    "dependencies": {
+        "next": "^14.0.0"
+    }
+}

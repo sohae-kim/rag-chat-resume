@@ -13,30 +13,59 @@ def load_embeddings() -> List[Dict[str, Any]]:
     """Load embeddings from JSON file with caching."""
     global _embeddings_cache
     if _embeddings_cache is None:
-        # Check multiple possible locations
-        possible_paths = [
-            # Standard locations
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
-            os.path.join(os.getcwd(), "data", "embeddings.json"),
-            "/var/task/data/embeddings.json",
-            # Backup locations
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "embeddings.json"),
-            os.path.join(os.getcwd(), "embeddings.json"),
-            "/var/task/embeddings.json",
-            # Temp directory
-            os.path.join(tempfile.gettempdir(), "embeddings.json")
-        ]
+        # Use process.cwd() approach as recommended by Vercel
+        data_dir = os.path.join(os.getcwd(), "data")
+        embeddings_path = os.path.join(data_dir, "embeddings.json")
         
-        # Try each path
-        for embeddings_path in possible_paths:
-            if os.path.exists(embeddings_path):
-                print(f"Loading embeddings from: {embeddings_path}")
-                try:
-                    with open(embeddings_path, "r") as f:
-                        _embeddings_cache = json.load(f)
-                    break
-                except Exception as e:
-                    print(f"Error loading from {embeddings_path}: {str(e)}")
+        print(f"Looking for embeddings at: {embeddings_path}")
+        
+        if os.path.exists(embeddings_path):
+            try:
+                with open(embeddings_path, "r") as f:
+                    _embeddings_cache = json.load(f)
+                print(f"Successfully loaded embeddings from {embeddings_path}")
+            except Exception as e:
+                print(f"Error loading embeddings: {str(e)}")
+                # Fall back to other locations
+                possible_paths = [
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
+                    "/var/task/data/embeddings.json",
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "embeddings.json"),
+                    os.path.join(os.getcwd(), "embeddings.json"),
+                    "/var/task/embeddings.json"
+                ]
+                
+                for path in possible_paths:
+                    if path != embeddings_path and os.path.exists(path):
+                        print(f"Trying alternative path: {path}")
+                        try:
+                            with open(path, "r") as f:
+                                _embeddings_cache = json.load(f)
+                            print(f"Successfully loaded embeddings from {path}")
+                            break
+                        except Exception as e:
+                            print(f"Error loading from {path}: {str(e)}")
+        else:
+            print(f"Embeddings file not found at {embeddings_path}")
+            # Try alternative paths
+            possible_paths = [
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "embeddings.json"),
+                "/var/task/data/embeddings.json",
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "embeddings.json"),
+                os.path.join(os.getcwd(), "embeddings.json"),
+                "/var/task/embeddings.json"
+            ]
+            
+            for path in possible_paths:
+                if path != embeddings_path and os.path.exists(path):
+                    print(f"Trying alternative path: {path}")
+                    try:
+                        with open(path, "r") as f:
+                            _embeddings_cache = json.load(f)
+                        print(f"Successfully loaded embeddings from {path}")
+                        break
+                    except Exception as e:
+                        print(f"Error loading from {path}: {str(e)}")
         
         if _embeddings_cache is None:
             # If we still don't have embeddings, use a fallback

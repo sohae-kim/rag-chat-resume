@@ -31,5 +31,10 @@
     ],
     "env": {
         "PYTHONPATH": "."
+    },
+    "functions": {
+        "api/index.py": {
+            "includeFiles": "data/**"
+        }
     }
 }

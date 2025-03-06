@@ -10,8 +10,8 @@ import json
 from pathlib import Path
 import traceback
 
-# Set up paths
-project_root = Path(__file__).parent.parent
+# Set up paths using process.cwd() approach
+project_root = Path(os.getcwd())
 data_dir = project_root / "data"
 content_path = data_dir / "content.json"
 embeddings_path = data_dir / "embeddings.json"
@@ -74,12 +74,6 @@ try:
     print(f"Saved {len(embeddings_data)} embeddings to {embeddings_path}")
     print(f"File exists: {embeddings_path.exists()}")
     print(f"File size: {embeddings_path.stat().st_size} bytes")
-    
-    # Create a copy in the root directory as a backup
-    root_embeddings_path = project_root / "embeddings.json"
-    with open(root_embeddings_path, "w") as f:
-        json.dump(embeddings_data, f)
-    print(f"Created backup at {root_embeddings_path}")
 
 except Exception as e:
     print(f"ERROR in build script: {str(e)}")
