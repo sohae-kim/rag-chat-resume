@@ -1,0 +1,10 @@
+fastapi==0.115.11
+uvicorn==0.34.0
+openai==1.65.2
+anthropic==0.49.0
+httpx==0.28.1
+python-dotenv==1.0.1
+numpy==2.0.2
+pydantic==2.10.6
+python-multipart==0.0.20
+mangum==0.17.0

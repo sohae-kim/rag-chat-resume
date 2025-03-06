@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with Sohae's Resume</title>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Chat about Sohae's Career Portfolio</h1>
+            <p>Ask me anything about my experience, projects, or skills!</p>
+        </div>
+
+        <div class="messages-container" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-content">
+                    Hi there! I can answer questions about Sohae's career, projects,
+                    experience, and skills. What would you like to know?
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <form id="chat-form">
+                <input type="text" id="questionInput" placeholder="Ask me anything about my portfolio..."
+                    maxlength="200">
+                <button type="submit" id="sendButton">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="send-icon">
+                        <path
+                            d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                    </svg>
+                </button>
+            </form>
+            <div class="char-count" id="charCount">0/200</div>
+        </div>
+    </div>
+
+    <script src="static/js/rag.js"></script>
+</body>
+
+</html>
