@@ -11,6 +11,7 @@ A Retrieval-Augmented Generation (RAG) chatbot that answers questions about my p
 - **Rate Limiting**: Prevents abuse with client and server-side rate limiting
 - **Responsive Design**: Works on desktop and mobile devices
 - **References**: Provides links to relevant sections of my portfolio
+- **Analytics**: Tracks usage patterns with Vercel Analytics
 
 ## Technology Stack
 
@@ -18,7 +19,8 @@ A Retrieval-Augmented Generation (RAG) chatbot that answers questions about my p
 - **Backend**: Python with FastAPI
 - **AI**: Anthropic Claude 3.5 Haiku for text generation
 - **Embeddings**: OpenAI's text-embedding-ada-002 for semantic search
-- **Deployment**: Vercel
+- **Deployment**: Vercel Serverless Functions
+- **Analytics**: Vercel Analytics
 
 ## How It Works
 
@@ -76,7 +78,7 @@ A Retrieval-Augmented Generation (RAG) chatbot that answers questions about my p
 
 ## Deployment
 
-This project is configured for deployment on Vercel:
+This project is configured for deployment on Vercel as a serverless function:
 
 1. Connect your GitHub repository to Vercel
 2. Set environment variables in the Vercel dashboard:
@@ -87,10 +89,16 @@ This project is configured for deployment on Vercel:
 ## Project Structure
 
 ```
-rag-chat/
+rag-chat-resume/
+├── api/                    # Vercel serverless functions
+│   ├── index.py            # Main API endpoint
+│   ├── chat.py             # Chat handler for AWS Lambda/Vercel
+│   └── __init__.py         # Package initialization
 ├── app/                    # Backend application
 │   ├── main.py             # FastAPI application
-│   └── utils.py            # Utility functions
+│   ├── utils.py            # Utility functions
+│   ├── logging.py          # Logging configuration
+│   └── __init__.py         # Package initialization
 ├── data/
 │   ├── content.json        # Portfolio content
 │   └── embeddings.json     # Generated embeddings (gitignored)
@@ -101,8 +109,12 @@ rag-chat/
 │   │   └── images/         # Images
 │   └── index.html          # Main HTML file
 ├── scripts/
-│   └── build.py            # Script to generate embeddings
+│   ├── build.py            # Script to generate embeddings
+│   └── generate_embeddings.py # Alternative embeddings generator
 ├── .env                    # Environment variables (gitignored)
+├── .gitignore              # Git ignore file
+├── next.config.js          # Next.js configuration for Vercel
+├── package.json            # Node.js package configuration
 ├── requirements.txt        # Python dependencies
 ├── vercel.json             # Vercel configuration
 └── README.md               # This file
